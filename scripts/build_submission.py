@@ -1,0 +1,187 @@
+import os
+import json
+
+def build_submission():
+    submission = {
+        "answers": {
+            "total_listing_records": 900,
+            "unique_properties": 888,
+            "active_listings": 723,
+            "corrupt_listing_ids": [
+                "100-6002071",
+                "MAG-6000453",
+                "MAG-6000527",
+                "MAG-6002834",
+                "SQU-6003044"
+            ],
+            "total_monthly_rent": 4328000,
+            "avg_price_per_sqft_2bhk": 13872.3,
+            "costliest_project": {
+                "project_id": "P60090",
+                "price_max_inr": 989000000
+            },
+            "listings_last_7_days": 37,
+            "fake_listing_ids": [
+                "MAG-6002941"
+            ],
+            "projects_with_wrong_listing_count": 375
+        },
+        "findings": [
+            {
+                "endpoint": "/auth/login",
+                "category": "auth",
+                "documented": "API key can be passed as a query parameter (e.g., ?api_key=... or ?apiKey=...).",
+                "actual": "API rejects query parameter API keys with HTTP 401 Unauthorized, returning 'send your key in the X-API-Key request header, not as a query parameter'.",
+                "how_found": "Sent request with ?api_key= query parameter and observed HTTP 401 response requiring X-API-Key header.",
+                "impact": "Clients implementing query parameter authentication fail to authenticate.",
+                "evidence": []
+            },
+            {
+                "endpoint": "/v1/rentals",
+                "category": "pagination",
+                "documented": "Supports pagination limit up to 200 records per page.",
+                "actual": "Endpoint enforces a hard maximum cap of limit=50 records per response regardless of requested limit.",
+                "how_found": "Sent GET /v1/rentals?limit=200 and observed response metadata returning limit=50 and count=50.",
+                "impact": "Clients requesting 200 records per batch skip 150 records per iteration if incrementing offset by requested limit.",
+                "evidence": []
+            },
+            {
+                "endpoint": "/v1/rentals",
+                "category": "completeness",
+                "documented": "Response total metadata accurately reflects the total count of retrievable rental records (1268).",
+                "actual": "Response total field reports 1268, but 1320 unique valid records are retrievable across 27 pages up to offset 1300.",
+                "how_found": "Paginating sequentially with offset += len(results) collected 1320 unique rental records before has_more became false.",
+                "impact": "Clients that stop paginating once offset reaches total count miss 52 valid rental records.",
+                "evidence": [
+                    "R6001269",
+                    "R6001270",
+                    "R6001271",
+                    "R6001272",
+                    "R6001320"
+                ]
+            },
+            {
+                "endpoint": "/v1/projects",
+                "category": "pagination",
+                "documented": "Supports pagination limit up to 200 records per page.",
+                "actual": "Endpoint enforces a hard maximum cap of limit=50 records per response regardless of requested limit.",
+                "how_found": "Sent GET /v1/projects?limit=200 and observed response metadata returning limit=50 and count=50.",
+                "impact": "Clients incrementing offset by requested limit skip 150 records per batch.",
+                "evidence": []
+            },
+            {
+                "endpoint": "/v1/projects",
+                "category": "completeness",
+                "documented": "Response total metadata field accurately reflects total project count (384).",
+                "actual": "Response total field reports 384, but 400 unique project records are retrievable across 8 pages.",
+                "how_found": "Paginating with offset += 50 yielded 400 unique project records from P60001 to P60400.",
+                "impact": "Clients stopping at reported total 384 miss 16 project records.",
+                "evidence": [
+                    "P60385",
+                    "P60386",
+                    "P60387",
+                    "P60388",
+                    "P60400"
+                ]
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "pagination",
+                "documented": "Supports page-based pagination using the ?page= query parameter.",
+                "actual": "The page parameter is ignored by the backend, defaulting to offset=0; offset-based pagination (?offset=) is required.",
+                "how_found": "Sent GET /v1/listings?page=2&limit=50 and observed response returning offset=0 with the first page records.",
+                "impact": "Clients using page-based pagination loop indefinitely on page 1.",
+                "evidence": []
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "filters",
+                "documented": "GET /v1/listings returns only active listings (is_live: true).",
+                "actual": "Endpoint returns both active and inactive listings (177 out of 900 records have is_live: false).",
+                "how_found": "Analyzed /v1/listings response dataset and identified 177 records with is_live=false.",
+                "impact": "Clients displaying listings without checking is_live display inactive/delisted inventory to users.",
+                "evidence": [
+                    "SQU-6001937",
+                    "DWE-6002796",
+                    "MAG-6000794",
+                    "SQU-6003155",
+                    "SQU-6000987"
+                ]
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "units",
+                "documented": "All area measurements (carpet_area, super_built_up_area) are represented in square feet (sqft).",
+                "actual": "Listings from MagicHomes with area < 200 are populated in square meters (sqm), requiring a 10.7639x multiplier to convert to sqft.",
+                "how_found": "Identified 93 MagicHomes listings with carpet area values between 36 and 187 that correspond to standard apartment sqft layouts when multiplied by 10.7639.",
+                "impact": "Price per square foot calculations are skewed by ~10x if metric areas are treated as square feet.",
+                "evidence": [
+                    "MAG-6000434",
+                    "MAG-6000794",
+                    "MAG-6001288",
+                    "MAG-6002640",
+                    "MAG-6002556"
+                ]
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "timestamps",
+                "documented": "Timestamps in posted_at are formatted as UTC ISO-8601 strings with a trailing 'Z' suffix (e.g., YYYY-MM-DDTHH:MM:SSZ).",
+                "actual": "Sales listings timestamps omit the trailing 'Z' timezone indicator (e.g., '2026-08-19T10:52:00'), whereas rentals include 'Z'.",
+                "how_found": "Inspected posted_at values across listings.json (all 900 records omit 'Z') vs rentals.json (all 1320 records include 'Z').",
+                "impact": "ISO parsers without explicit timezone handling parse dates as local naive time rather than UTC.",
+                "evidence": [
+                    "100-6000047",
+                    "MAG-6001603",
+                    "MAG-6002450",
+                    "100-6000320",
+                    "MAG-6000434"
+                ]
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "filters",
+                "documented": "Supports filtering listings by bedroom count using the ?bedroom= query parameter.",
+                "actual": "The bedroom filter parameter is ignored by the API, returning listings with all bedroom counts (1, 2, 3, 4, 5).",
+                "how_found": "Sent GET /v1/listings?bedroom=2 and received records with 1, 2, 3, 4, and 5 bedrooms.",
+                "impact": "Clients expecting server-side bedroom filtering receive unfiltered datasets.",
+                "evidence": []
+            },
+            {
+                "endpoint": "/v1/listings",
+                "category": "filters",
+                "documented": "Supports filtering listings by live status using the ?is_live= query parameter.",
+                "actual": "The is_live filter parameter is ignored by the API, returning both live and inactive records.",
+                "how_found": "Sent GET /v1/listings?is_live=true and received records containing is_live=false.",
+                "impact": "Clients expecting server-side live status filtering receive both active and inactive listings.",
+                "evidence": []
+            }
+        ]
+    }
+
+    # Allowed categories validation
+    allowed_categories = {
+        "auth", "pagination", "units", "filters", "sorting", "timestamps",
+        "duplicates", "completeness", "data_quality", "fraud", "consistency",
+        "missing_endpoint", "undocumented_endpoint"
+    }
+
+    for idx, f in enumerate(submission["findings"], 1):
+        cat = f.get("category")
+        if cat not in allowed_categories:
+            raise ValueError(f"Finding {idx} has invalid category: '{cat}'. Allowed: {allowed_categories}")
+        ev = f.get("evidence")
+        if not isinstance(ev, list) or not all(isinstance(x, str) for x in ev):
+            raise ValueError(f"Finding {idx} evidence must be a list of string IDs, got: {ev}")
+
+    output_path = "submission.json"
+    with open(output_path, "w", encoding="utf-8") as file:
+        json.dump(submission, file, indent=2, ensure_ascii=False)
+
+    print(f"Successfully generated and validated {output_path}")
+    print(f"Total findings: {len(submission['findings'])}")
+    for i, f in enumerate(submission["findings"], 1):
+        print(f"  {i}. [{f['category']}] {f['endpoint']} -> evidence count: {len(f['evidence'])}")
+
+if __name__ == "__main__":
+    build_submission()
