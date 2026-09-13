@@ -1,4 +1,13 @@
 {
+  "api_key":	"IVY26-024B2C494F40" ,
+
+  "candidate": {
+    "name": "Arpita Maurya",
+    "email": "arpita.20235019@mnnit.ac.in",
+    "repo_url": "https://github.com/2024Arpita/ivy-homes-assignment",
+    "demo_url": "https://ivy-homes-assignment-pi.vercel.app"
+  },
+
   "answers": {
     "total_listing_records": 900,
     "unique_properties": 888,
@@ -22,6 +31,7 @@
     ],
     "projects_with_wrong_listing_count": 375
   },
+
   "findings": [
     {
       "endpoint": "/auth/login",
@@ -32,6 +42,7 @@
       "impact": "Clients implementing query parameter authentication fail to authenticate.",
       "evidence": []
     },
+
     {
       "endpoint": "/v1/rentals",
       "category": "pagination",
@@ -41,6 +52,7 @@
       "impact": "Clients requesting 200 records per batch skip 150 records per iteration if incrementing offset by requested limit.",
       "evidence": []
     },
+
     {
       "endpoint": "/v1/rentals",
       "category": "completeness",
@@ -56,6 +68,7 @@
         "R6001320"
       ]
     },
+
     {
       "endpoint": "/v1/projects",
       "category": "pagination",
@@ -65,6 +78,7 @@
       "impact": "Clients incrementing offset by requested limit skip 150 records per batch.",
       "evidence": []
     },
+
     {
       "endpoint": "/v1/projects",
       "category": "completeness",
@@ -80,6 +94,7 @@
         "P60400"
       ]
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "pagination",
@@ -89,6 +104,7 @@
       "impact": "Clients using page-based pagination loop indefinitely on page 1.",
       "evidence": []
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "filters",
@@ -104,6 +120,7 @@
         "SQU-6000987"
       ]
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "units",
@@ -119,6 +136,7 @@
         "MAG-6002556"
       ]
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "timestamps",
@@ -134,6 +152,7 @@
         "MAG-6000434"
       ]
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "filters",
@@ -143,6 +162,7 @@
       "impact": "Clients expecting server-side bedroom filtering receive unfiltered datasets.",
       "evidence": []
     },
+
     {
       "endpoint": "/v1/listings",
       "category": "filters",
